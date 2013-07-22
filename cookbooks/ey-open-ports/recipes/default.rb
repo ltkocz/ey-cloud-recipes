@@ -12,10 +12,10 @@ r = gem_package "aws-sdk" do
 end
 r.run_action :install
 Gem.clear_paths
-require 'aws'
-# open ports via Aws
+
 ruby_block "open up ports via EC2 security groups" do
   block do
+    require 'aws'
     # connect to EC2
     ec2 = AWS::EC2.new(:access_key_id => node['aws_secret_id'], :secret_access_key => node['aws_secret_key'],:region => node['engineyard']['environment']['region'])
     # find security group for environment
