@@ -7,14 +7,15 @@ ports = [
   {:port =>11300, :protocol => 'tcp', :ip_range =>"front"}
 ]
 
-chef_gem "aws-sdk" do
-  action :install
+r = gempackage "aws-sdk" do
+  action :nothing
 end
-
+r.runaction(:install)
+Gem.clearpaths
+require 'aws'
 # open ports via Aws
 ruby_block "open up ports via EC2 security groups" do
   block do
-    require 'aws'
     # connect to EC2
     ec2 = AWS::EC2.new(:access_key_id => node['aws_secret_id'], :secret_access_key => node['aws_secret_key'],:region => node['engineyard']['environment']['region'])
     # find security group for environment
