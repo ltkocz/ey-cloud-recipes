@@ -7,7 +7,7 @@ ports = [
   {:port =>11300, :protocol => 'tcp', :ip_range =>"front"}
 ]
 
-r = gempackage "aws-sdk" do
+r = gem_package "aws-sdk" do
   action :nothing
 end
 r.runaction(:install)
