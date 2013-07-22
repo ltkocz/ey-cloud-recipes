@@ -1,12 +1,12 @@
 # port numbers that you wish to open up on your environment 
 ports = [
-  [21,'tcp', '0.0.0.0/0'],
-  [3306, 'tcp', "172.31.38.164"],
-  [9312, 'tcp',  "172.31.38.164"],
-  [11300, 'tcp',"172.31.38.164"]
+  {:port => 21, :protocol => 'tcp', :ip_range =>'0.0.0.0/0'},
+  {:port =>3306, :protocol => 'tcp', :ip_range =>'172.31.38.164/32'},
+  {:port =>9312, :protocol => 'tcp', :ip_range => "172.31.38.164/32"},
+  {:port =>11300, :protocol => 'tcp', :ip_range =>"172.31.38.164/32"}
 ]
 
-chef_gem "aws" do
+chef_gem "aws-sdk" do
   action :install
 end
 
@@ -14,28 +14,25 @@ end
 ruby_block "open up ports via EC2 security groups" do
   block do
     require 'aws'
-      
-    # build server
-    region = node['engineyard']['environment']['region']
-    server = "ec2.#{region}.amazonaws.com"
-
-    # connect to EC2 via fog
-    ec2 = Aws::Ec2.new( node['aws_secret_id'], node['aws_secret_key'],{:server => server })
-    
+    # connect to EC2
+    ec2 = AWS::EC2.new(:access_key_id => node['aws_secret_id'], :secret_access_key => node['aws_secret_key'],:region => node['engineyard']['environment']['region'])
     # find security group for environment
     env_name = node['engineyard']['environment']['name']
-    sgroup = ec2.describe_security_groups.find{|e| e[:aws_group_name][/\Aey-#{env_name}-\d+/]}
-    group = sgroup[:aws_group_name]
-    # get ports that are already open
-    open_ports = sgroup[:aws_perms].select{|p| p[:groups].empty?}.map{|e| (e[:from_port]..e[:to_port]).to_a}.flatten
+    security_groups = ec2.security_groups.filter("group-name","*#{env_name}*")
     
-    # authorize port if not already authorized
-    ports.each do |port|
-      if open_ports.include?(port)
-        Chef::Log.info "Port #{port} is already open (open ports: #{open_ports.join(', ')})"
-      else
-        Chef::Log.info "Opening port #{port} to the outside world"
-        ec2.authorize_security_group_IP_ingress(group, port[0],port[0], port[1],port[2])
+    security_groups.each do |security_group|
+      open_ports = security_group.ingress_ip_permissions.select{|ip_permission| 
+        ip_permission.groups.empty?
+      }.map{|ip_permission|  
+        "#{ip_permission.port_range.min}:#{e.protocol}"
+      }.flatten.uniq
+      ports.each do |port|
+        if open_ports.include?("#{port[:port]}:#{port[:protocol]}")
+          Chef::Log.info "Port #{port[:port]}:#{port[:protocol]} is already open (open ports: #{open_ports.join(', ')})"
+        else
+          Chef::Log.info "Opening port #{port[:port]}:#{port[:protocol]} to #{port[:ip_range]}"
+          security_group.authorize_ingress(port[:protocol].to_sym, port[:port],port[:ip_range])
+        end
       end
     end
   end
