@@ -1,31 +1,33 @@
 # port numbers that you wish to open up on your environment 
-ports = [21, 3306, 9312, 11300]
+ports = [
+  [21,'tcp', '0.0.0.0/0']
+  [3306, 'tcp', "172.31.38.164"]
+  [9312, 'tcp',  "172.31.38.164"]
+  [11300, 'tcp',"172.31.38.164"]
+]
 
-# open ports via fog
+chef_gem "aws" do
+  action :install
+end
+
+# open ports via Aws
 ruby_block "open up ports via EC2 security groups" do
   block do
-    # require fog gem (version 0.7.2)
-    require 'fog'
+    require 'aws'
       
-    # build endpoint (fixes issue with fog 0.7.2 not knowing about newer regions)
+    # build server
     region = node['engineyard']['environment']['region']
-    endpoint = "https://ec2.#{region}.amazonaws.com:443/"
+    server = "ec2.#{region}.amazonaws.com"
 
     # connect to EC2 via fog
-    ec2 = Fog::Compute.new({
-      :provider => 'AWS',
-      :aws_access_key_id => node['aws_secret_id'],
-      :aws_secret_access_key => node['aws_secret_key'],
-      :endpoint => endpoint
-    })
+    ec2 = Aws::Ec2.new( node['aws_secret_id'], node['aws_secret_key'],{:server => server })
     
     # find security group for environment
     env_name = node['engineyard']['environment']['name']
-    security_group = ec2.security_groups.all.find{|g| g.name[/\Aey-#{env_name}-\d+/]}
-    
+    sgroup = ec2.describe_security_groups.find{|e| e[:aws_group_name][/\Aey-#{env_name}-\d+/]}
+    group = sgroup[:aws_group_name]
     # get ports that are already open
-    permissions = security_group.ip_permissions.select{|p| p['groups'].empty?}
-    open_ports = permissions.map{|p| (p['fromPort'].to_i..p['toPort'].to_i).to_a}.flatten
+    open_ports = sgroup[:aws_perms].select{|p| p[:groups].empty?}.map{|e| (e[:from_port]..e[:to_port]).to_a}.flatten
     
     # authorize port if not already authorized
     ports.each do |port|
@@ -33,7 +35,7 @@ ruby_block "open up ports via EC2 security groups" do
         Chef::Log.info "Port #{port} is already open (open ports: #{open_ports.join(', ')})"
       else
         Chef::Log.info "Opening port #{port} to the outside world"
-        security_group.authorize_port_range(port..port)
+        ec2.authorize_security_group_IP_ingress(group, port[0],port[0], port[1],port[2])
       end
     end
   end
