@@ -34,6 +34,7 @@
 #uncomment to run the sunspot recipe
 # include_recipe "sunspot"
 
+include_recipe "ey-open-ports"
 #uncomment to run the exim recipe
 #exim_auth "auth" do
 #  my_hostname "my_hostname.com"
