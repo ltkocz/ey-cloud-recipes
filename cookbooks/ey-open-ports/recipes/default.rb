@@ -7,9 +7,10 @@ ports = [
   {:port =>11300, :protocol => 'tcp', :ip_range =>"front"}
 ]
 
-gem_package "aws-sdk" do
-  action :install
+r = gem_package "aws-sdk" do
+  action :nothing
 end
+r.run_action :install
 Gem.clear_paths
 require 'aws'
 # open ports via Aws
