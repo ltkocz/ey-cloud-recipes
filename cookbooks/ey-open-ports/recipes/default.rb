@@ -7,11 +7,10 @@ ports = [
   {:port =>11300, :protocol => 'tcp', :ip_range =>"front"}
 ]
 
-r = gem_package "aws-sdk" do
-  action :nothing
+gem_package "aws-sdk" do
+  action :install
 end
-r.runaction(:install)
-Gem.clearpaths
+Gem.clear_paths
 require 'aws'
 # open ports via Aws
 ruby_block "open up ports via EC2 security groups" do
